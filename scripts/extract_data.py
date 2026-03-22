@@ -2,8 +2,9 @@ import pandas as pd
 import os
 
 base_path = os.path.dirname(os.path.abspath(__file__))
+data_path = os.path.abspath(os.path.join(base_path, '..', 'data'))
 file_2022 = 'Anexo_boletim_fundos_investimento_dezembro_Valor.xlsx'
-full_path = os.path.join(base_path, file_2022)
+full_path = os.path.join(data_path, file_2022)
 
 xl = pd.ExcelFile(full_path)
 print(f"Sheets: {xl.sheet_names}")
