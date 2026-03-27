@@ -158,6 +158,17 @@ print("             SUMÁRIO DA REGRESSÃO (ROBUSTA HAC)")
 print("="*50)
 print(modelo.summary())
 
+# --- Salvar Sumário da Regressão na pasta results ---
+sumario_txt_path = os.path.join(results_path, 'sumario_regressao.txt')
+with open(sumario_txt_path, 'w', encoding='utf-8') as f:
+    f.write(modelo.summary().as_text())
+
+sumario_csv_path = os.path.join(results_path, 'sumario_regressao.csv')
+with open(sumario_csv_path, 'w', encoding='utf-8') as f:
+    f.write(modelo.summary().as_csv())
+
+print(f"\n[OK] Tabelas de resultados salvas em: {results_path}")
+
 
 # --- 8. VISUALIZAÇÃO 1: DISPERSÃO E REGRESSÃO (ASSOCIAÇÃO ESTATÍSTICA) ---
 import seaborn as sns
