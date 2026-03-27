@@ -3,7 +3,7 @@
 Este repositório contém o código e os dados utilizados para a análise de regressão linear do TCC sobre a associação entre a taxa Selic e o patrimônio líquido dos fundos de renda fixa no Brasil.
 
 ## 📊 Objetivo
-O objetivo do estudo é verificar se existe associação estatística entre a taxa Selic e o patrimônio líquido dos fundos de renda fixa, controlando pelo IPCA (inflação).
+O objetivo do estudo é verificar se existe associação estatística entre a taxa Selic e o patrimônio líquido dos fundos de renda fixa, controlando pelo IPCA (inflação) e pelo índice IMA-B.
 
 ## 📂 Estrutura do Projeto
 - `data/`: Contém os dados brutos obtidos do Banco Central (BCB) e ANBIMA.
@@ -47,9 +47,9 @@ Siga os passos abaixo para executar a análise localmente após o clone:
 
 ## 📉 Resultados e Rigor Estatístico
 O projeto foi aprimorado com técnicas avançadas para atender exigências de bancas de TCC:
-- **Testes de Estacionariedade (ADF):** Verificação de raiz unitária para evitar regressões espúrias.
-- **Erros-Padrão Robustos (HAC/Newey-West):** Correção de autocorrelação nos resíduos (Durbin-Watson baixo), garantindo que os p-valores sejam confiáveis.
-- **Resultados:** O modelo confirmou um impacto positivo e estatisticamente significativo da taxa Selic no patrimônio líquido dos fundos (p < 0.001), mesmo com a correção HAC.
+- **Testes de Estacionariedade (ADF):** Analisou-se a raiz unitária das séries em nível, confirmando a não-estacionariedade de componentes chave como Patrimônio e Selic.
+- **Primeira Diferença:** O modelo de regressão múltipla OLS foi ajustado utilizando a primeira diferença (variação percentual/absoluta) de todas as variáveis (Patrimônio, Selic, IPCA e IMA-B), mitigando o risco comum de regressão linear espúria em séries financeiras.
+- **Erros-Padrão Robustos (HAC/Newey-West):** Correção de autocorrelação nos resíduos para dados temporais, garantindo inferências (p-valores) confiáveis.
 
 ---
 *Projeto desenvolvido para fins acadêmicos (TCC).*
