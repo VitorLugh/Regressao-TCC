@@ -15,10 +15,11 @@ if not os.path.exists(results_path):
 
 selic_file = os.path.join(data_path, 'SELIC-STP-20260321213426004.csv')
 ipca_file = os.path.join(data_path, 'IPCA-STP-20260321213354533.csv')
+imab_file = os.path.join(data_path, 'IMAB_2019_2022.csv')
 
 excel_files = {
     2019: ('Anexo-Boletim-FI-201912.xlsx', 'Pag. 3 - PL por Classe'),
-    2021: ('Anexo-Boletim-FI-202112.xlsx', 'Pag. 3 - PL por Classe'),
+    '2020_2021': ('Anexo-Boletim-FI-202112.xlsx', 'Pag. 3 - PL por Classe'), # Este arquivo contém o histórico de 2020 e 2021 juntos
     2022: ('Anexo_boletim_fundos_investimento_dezembro_Valor.xlsx', 'Pág. 4 - PL por Classe')
 }
 
@@ -46,6 +47,17 @@ ipca['IPCA'] = pd.to_numeric(ipca['IPCA'], errors='coerce')
 ipca.dropna(subset=['data', 'IPCA'], inplace=True)
 ipca.set_index('data', inplace=True)
 
+# --- 3.5 CARREGAR IMA-B (ANBIMA) ---
+imab = pd.read_csv(imab_file, sep=';', decimal=',', engine='python', encoding='latin1')
+imab = imab[['Data de Referencia', 'Numero Indice']].copy()
+imab.columns = ['data', 'IMAB']
+imab['data'] = pd.to_datetime(imab['data'], errors='coerce')
+imab['IMAB'] = pd.to_numeric(imab['IMAB'], errors='coerce')
+imab.dropna(subset=['data', 'IMAB'], inplace=True)
+imab.set_index('data', inplace=True)
+# Resampling para média mensal
+imab_mensal = imab['IMAB'].resample('MS').mean()
+
 # --- 4. CARREGAR PATRIMÔNIO (ANBIMA) ---
 dfs_anbima = []
 
@@ -59,14 +71,14 @@ df19 = df19[['data', rf_col19]].copy()
 df19.columns = ['data', 'Patrimonio']
 dfs_anbima.append(df19)
 
-# Extração de 2020-2021
-f21, s21 = excel_files[2021]
-df21 = pd.read_excel(os.path.join(data_path, f21), sheet_name=s21, skiprows=4)
-df21.columns.values[0] = 'data'
-rf_col21 = [c for c in df21.columns if 'Renda fixa' in str(c) or 'Renda Fixa' in str(c)][0]
-df21 = df21[['data', rf_col21]].copy()
-df21.columns = ['data', 'Patrimonio']
-dfs_anbima.append(df21)
+# Extração de 2020 e 2021 (O arquivo de 2021 já engloba todo o ano de 2020)
+f20_21, s20_21 = excel_files['2020_2021']
+df20_21 = pd.read_excel(os.path.join(data_path, f20_21), sheet_name=s20_21, skiprows=4)
+df20_21.columns.values[0] = 'data'
+rf_col20_21 = [c for c in df20_21.columns if 'Renda fixa' in str(c) or 'Renda Fixa' in str(c)][0]
+df20_21 = df20_21[['data', rf_col20_21]].copy()
+df20_21.columns = ['data', 'Patrimonio']
+dfs_anbima.append(df20_21)
 
 # Extração de 2022
 f22, s22 = excel_files[2022]
@@ -89,6 +101,7 @@ anbima = anbima.loc['2019-01-01':'2022-12-01']
 
 # --- 5. JUNÇÃO DOS DADOS (MERGE) ---
 df = pd.merge(selic_mensal, ipca, left_index=True, right_index=True)
+df = pd.merge(df, imab_mensal, left_index=True, right_index=True)
 df = pd.merge(df, anbima, left_index=True, right_index=True)
 
 # Garantir que todos os dados sejam numéricos
@@ -119,11 +132,22 @@ def test_stationarity(series, name):
 
 test_stationarity(df['Patrimonio'], 'Patrimônio Líquido')
 test_stationarity(df['Selic'], 'Taxa Selic')
+test_stationarity(df['IPCA'], 'IPCA')
+test_stationarity(df['IMAB'], 'IMA-B')
 
-# --- 7. MODELAGEM OLS COM ERROS-PADRÃO ROBUSTOS (HAC/NEWEY-WEST) ---
+# --- 7. MODELAGEM OLS PRIMEIRA DIFERENÇA COM ERROS-PADRÃO ROBUSTOS (HAC) ---
+# Transformando as variáveis em variação (primeira diferença)
+df['Patrimonio_diff'] = df['Patrimonio'].diff()
+df['Selic_diff'] = df['Selic'].diff()
+df['IPCA_diff'] = df['IPCA'].diff()
+df['IMAB_diff'] = df['IMAB'].diff()
+
+# Removendo os valores NaN que surgem ao aplicar .diff()
+df.dropna(inplace=True)
+
 # Adicionar constante para o intercepto
-X = sm.add_constant(df[['Selic', 'IPCA']])
-y = df['Patrimonio']
+X = sm.add_constant(df[['Selic_diff', 'IPCA_diff', 'IMAB_diff']])
+y = df['Patrimonio_diff']
 
 # Usando cov_type='HAC' (Newey-West) para corrigir autocorrelação nos resíduos
 # maxlags=1 é uma escolha conservadora para dados mensais
@@ -143,26 +167,26 @@ import matplotlib.patches as mpatches
 plt.figure(figsize=(12, 7))
 
 # Regplot do Seaborn com a linha e IC (95% CI)
-sns.regplot(x='Selic', y='Patrimonio', data=df, 
+sns.regplot(x='Selic_diff', y='Patrimonio_diff', data=df, 
             scatter=False, 
             line_kws={'color':'red'}, 
             ci=95)
 
 # Plotar os pontos manualmente com label
-plt.scatter(df['Selic'], df['Patrimonio'], color='blue', alpha=0.6)
+plt.scatter(df['Selic_diff'], df['Patrimonio_diff'], color='blue', alpha=0.6)
 
 # Criar handles manuais para a legenda
 blue_dot = mlines.Line2D([], [], color='blue', marker='o', linestyle='None',
-                          markersize=8, alpha=0.6, label='Patrimônio Mensal Observado')
+                          markersize=8, alpha=0.6, label='Variação do Patrimônio Mensal')
 red_line = mlines.Line2D([], [], color='red', label='Linha de Tendência OLS')
 red_shadow = mpatches.Patch(color='red', alpha=0.2, label='Intervalo de Confiança (95%)')
 
 # Adicionar legendas
 plt.legend(handles=[blue_dot, red_line, red_shadow], loc='upper left', fontsize=10)
 
-plt.title('Dispersão: Taxa Selic vs. Patrimônio Líquido (Renda Fixa)\nCom Linha de Tendência e Margem de Confiança 95%', fontsize=14)
-plt.xlabel('Taxa Selic (% a.a.)', fontsize=12)
-plt.ylabel('Patrimônio Líquido (milhões R$)', fontsize=12)
+plt.title('Dispersão: Variação Selic vs. Variação Patrimônio Líquido\nCom Linha de Tendência e Margem de Confiança 95%', fontsize=14)
+plt.xlabel('Variação da Taxa Selic (p.p.)', fontsize=12)
+plt.ylabel('Variação do Patrimônio Líquido (milhões R$)', fontsize=12)
 plt.grid(True, linestyle='--', alpha=0.5)
 
 # Salvar gráfico 1
@@ -173,31 +197,31 @@ print(f"\nGráfico de Dispersão salvo em: {scat_path}")
 
 # --- 9. VISUALIZAÇÃO 2: SÉRIE TEMPORAL COM REGRESSÃO (DUPLO EIXO) ---
 # Calcular valores previstos pelo modelo para comparação temporal
-df['Patrimonio_Previsto'] = modelo.predict(X)
+df['Patrimonio_diff_Previsto'] = modelo.predict(X)
 
 fig, ax1 = plt.subplots(figsize=(12, 7))
 
-# Eixo 1: Patrimônio Líquido (Observado e Previsto)
+# Eixo 1: Variação do Patrimônio Líquido (Observado e Previsto)
 ax1.set_xlabel('Período (2019 - 2022)', fontsize=12)
-ax1.set_ylabel('Patrimônio Líquido (R$ milhões)', color='blue', fontsize=12)
+ax1.set_ylabel('Variação do Patrimônio Líquido (R$ milhões)', color='blue', fontsize=12)
 
 # Linha do observado
-ax1.plot(df.index, df['Patrimonio'], color='blue', linewidth=2, label='Patrimônio Observado (Real)')
+ax1.plot(df.index, df['Patrimonio_diff'], color='blue', linewidth=2, label='Variação Observada (Real)')
 # Linha do previsto pela regressão
-ax1.plot(df.index, df['Patrimonio_Previsto'], color='green', linewidth=2, linestyle='--', label='Ajuste da Regressão (Modelo OLS)')
+ax1.plot(df.index, df['Patrimonio_diff_Previsto'], color='green', linewidth=2, linestyle='--', label='Ajuste da Regressão (Modelo OLS)')
 
 ax1.tick_params(axis='y', labelcolor='blue')
 ax1.grid(True, linestyle='--', alpha=0.3)
 
-# Criar o segundo eixo para a Selic
+# Criar o segundo eixo para a Variação da Selic
 ax2 = ax1.twinx()
 color = 'tab:red'
-ax2.set_ylabel('Taxa Selic (% a.a.)', color=color, fontsize=12)
-ax2.plot(df.index, df['Selic'], color=color, linewidth=2, linestyle=':', label='Taxa Selic (Variável Independente)')
+ax2.set_ylabel('Variação Taxa Selic (p.p.)', color=color, fontsize=12)
+ax2.plot(df.index, df['Selic_diff'], color=color, linewidth=2, linestyle=':', label='Variação Selic (Variável Independente)')
 ax2.tick_params(axis='y', labelcolor=color)
 
 # Título e ajustes
-plt.title('Evolução Temporal: Selic vs. Patrimônio Líquido (Renda Fixa)\nComparação: Dados Reais vs. Modelo de Regressão (2019-2022)', fontsize=14)
+plt.title('Evolução Temporal: Variação Selic vs. Variação Patrimônio Líquido\nComparação: Dados Reais vs. Modelo de Regressão (2019-2022)', fontsize=14)
 fig.tight_layout()
 
 # Combinar as legendas
