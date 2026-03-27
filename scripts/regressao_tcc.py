@@ -159,15 +159,39 @@ print("="*50)
 print(modelo.summary())
 
 # --- Salvar Sumário da Regressão na pasta results ---
-sumario_txt_path = os.path.join(results_path, 'sumario_regressao.txt')
-with open(sumario_txt_path, 'w', encoding='utf-8') as f:
-    f.write(modelo.summary().as_text())
+df_coef = pd.DataFrame(modelo.summary().tables[1].data)
+df_coef.columns = df_coef.iloc[0]
+df_coef = df_coef[1:]
+
+fig, ax = plt.subplots(figsize=(10, 3))
+ax.axis('off')
+ax.axis('tight')
+
+# Criar a tabela formatada (bonitinha)
+table = ax.table(cellText=df_coef.values, colLabels=df_coef.columns, loc='center', cellLoc='center')
+table.auto_set_font_size(False)
+table.set_fontsize(11)
+table.scale(1.2, 1.8)
+
+# Estilização com cabeçalho azul e listras
+for (row, col), cell in table.get_celld().items():
+    if row == 0:
+        cell.set_text_props(weight='bold', color='white')
+        cell.set_facecolor('#4c72b0')
+    else:
+        if row % 2 == 0:
+            cell.set_facecolor('#f2f2f2')
+
+plt.title('Tabela de Coeficientes da Regressão OLS (HAC)', fontweight='bold', fontsize=14, pad=20)
+sumario_jpg_path = os.path.join(results_path, 'sumario_regressao.jpg')
+plt.savefig(sumario_jpg_path, bbox_inches='tight', dpi=300)
+plt.close()
 
 sumario_csv_path = os.path.join(results_path, 'sumario_regressao.csv')
 with open(sumario_csv_path, 'w', encoding='utf-8') as f:
     f.write(modelo.summary().as_csv())
 
-print(f"\n[OK] Tabelas de resultados salvas em: {results_path}")
+print(f"\n[OK] Tabelas de resultados (JPG e CSV) salvas em: {results_path}")
 
 
 # --- 8. VISUALIZAÇÃO 1: DISPERSÃO E REGRESSÃO (ASSOCIAÇÃO ESTATÍSTICA) ---

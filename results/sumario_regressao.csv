@@ -3,7 +3,7 @@ Dep. Variable:   ,Patrimonio_diff ,  R-squared:         ,   0.364
 Model:           ,OLS             ,  Adj. R-squared:    ,   0.323
 Method:          ,Least Squares   ,  F-statistic:       ,   7.241
 Date:            ,Thu, 26 Mar 2026,  Prob (F-statistic):,0.000445
-Time:            ,21:34:02        ,  Log-Likelihood:    , -583.29
+Time:            ,21:36:17        ,  Log-Likelihood:    , -583.29
 No. Observations:,    50          ,  AIC:               ,   1175.
 Df Residuals:    ,    46          ,  BIC:               ,   1182.
 Df Model:        ,     3          ,                     ,        
